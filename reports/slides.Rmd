@@ -3,11 +3,69 @@ title: "Presentación — M8 Reto 2"
 output: ioslides_presentation
 ---
 
-```{r setup, include=FALSE}
-knitr::opts_chunk$set(echo = FALSE, message = FALSE, warning = FALSE)
+## Objetivos
+- Principal: evolución del TFR y umbral 2.1  
+- Específicos: depurar; tendencias; año de cruce; comparación último año
+
+```{r echo=FALSE, message=FALSE, warning=FALSE}
+# Detectar carpeta del proyecto (si estás dentro de reports, sube un nivel)
+proj_dir <- normalizePath(if (basename(getwd()) == "reports") ".." else ".")
+
+# Paquetes
 pkgs <- c("dplyr","readr","ggplot2","knitr")
 to_install <- setdiff(pkgs, rownames(installed.packages()))
-if (length(to_install)) install.packages(to_install)
-library(dplyr); library(readr); library(ggplot2)
-df <- if (file.exists("data/tfr_gapminder.rds")) readRDS("data/tfr_gapminder.rds")
-      else if (file.exists("data/tfr_gapminder.csv")) read_csv("data/tfr_gapminder.csv", show_col_types = FALSE)
+if (length(to_install)) install.packages(to_install, repos = "https://cloud.r-project.org")
+library(dplyr); library(readr); library(ggplot2); library(knitr)
+
+# Rutas de datos
+path_rds <- file.path(proj_dir, "data", "tfr_gapminder.rds")
+path_csv <- file.path(proj_dir, "data", "tfr_gapminder.csv")
+
+# Carga de datos
+df <- NULL
+if (file.exists(path_rds)) {
+  df <- readRDS(path_rds)
+} else if (file.exists(path_csv)) {
+  df <- readr::read_csv(path_csv, show_col_types = FALSE)
+}
+
+# Señal visual para comprobar que hay contenido
+cat("**Comprobación:** este texto debería verse.\n\n")
+if (is.null(df)) {
+  cat("⚠️ No se encontraron datos.\n")
+} else {
+  cat("✅ Datos cargados. Filas:", nrow(df), " — Columnas:", ncol(df), "\n")
+}
+```
+
+## Tabla resumen (último año)
+```{r echo=FALSE}
+if (!is.null(df) && all(c("country","year","tfr") %in% names(df))) {
+  ultimo <- max(df$year, na.rm = TRUE)
+  tab <- df |>
+    dplyr::filter(year == ultimo) |>
+    summarise(
+      n_paises = dplyr::n_distinct(country),
+      mediana_tfr = median(tfr, na.rm = TRUE),
+      q1 = quantile(tfr, 0.25, na.rm = TRUE),
+      q3 = quantile(tfr, 0.75, na.rm = TRUE),
+      pct_bajo_2_1 = mean(tfr <= 2.1, na.rm = TRUE) * 100
+    )
+  knitr::kable(tab, digits = 2)
+} else {
+  "⚠️ No se pudo generar la tabla."
+}
+```
+
+## Serie por país (ejemplo)
+```{r echo=FALSE}
+if (!is.null(df) && all(c("country","year","tfr") %in% names(df))) {
+  pais <- if ("Spain" %in% df$country) "Spain" else df$country[1]
+  ggplot(dplyr::filter(df, country == pais), aes(year, tfr)) +
+    geom_line() +
+    geom_hline(yintercept = 2.1, linetype = "dashed") +
+    labs(title = paste("TFR —", pais), x = "Año", y = "TFR")
+} else {
+  plot(pressure)
+}
+```
